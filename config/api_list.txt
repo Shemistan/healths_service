@@ -1,1 +1,10 @@
 http://127.0.0.1:8080/healthz
+http://127.0.0.1:8080/healthz2
+http://127.0.0.1:8080/healthz3
+http://127.0.0.1:8080/healthz4
+http://127.0.0.1:8080/healthz5
+http://127.0.0.1:8080/healthz6
+http://127.0.0.1:8080/healthz7
+http://127.0.0.1:8080/healthz8
+http://127.0.0.1:8080/healthz9
+http://127.0.0.1:8080/healthz10
