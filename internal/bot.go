@@ -50,7 +50,7 @@ func (b *Bot) Send(msg string, chatID int64) error {
 func (b *Bot) Receive() {
 	updates, _ := b.bot.GetUpdatesChan(b.updateConfig)
 	result := make(chan string)
-
+	defer close(result)
 	for update := range updates {
 		if update.Message == nil {
 			continue
