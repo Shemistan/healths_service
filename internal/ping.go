@@ -27,15 +27,16 @@ func (r *Runner) Stop() {
 }
 
 func (r *Runner) Start(result chan string, timeout time.Duration) {
-	var temp string
 	r.isRunning = true
 	for {
 		if r.isRunning {
 			for _, url := range r.urls {
 				res, _ := http.Get(url)
-				temp += url + " : " + res.Status + "\n"
+				if res.StatusCode != 200 {
+					result <- url + " : " + res.Status + "\n"
+				}
+				result <- url + " : " + res.Status + "\n"
 			}
-			result <- temp
 			time.Sleep(time.Second * timeout)
 		} else {
 			break

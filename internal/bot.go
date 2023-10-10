@@ -1,10 +1,12 @@
 package internal
 
 import (
+	"fmt"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Bot struct {
@@ -65,14 +67,24 @@ func (b *Bot) Receive() {
 				b.data[update.Message.Chat.ID].Remove(strings.ReplaceAll(update.Message.Text, "/remove ", ""))
 			case "run":
 				{
-					go b.data[update.Message.Chat.ID].Start(result, 10)
-					go b.Send(<-result, update.Message.Chat.ID)
+					timeout, _ := strconv.Atoi(strings.ReplaceAll(update.Message.Text, "/run ", ""))
+					go b.data[update.Message.Chat.ID].Start(result, time.Duration(timeout))
+					reading := func() {
+						for {
+							if err := b.Send(<-result, update.Message.Chat.ID); err != nil {
+								fmt.Println(err)
+							}
+						}
+					}
+					go reading()
 				}
 			case "stop":
 				b.data[update.Message.Chat.ID].Stop()
 			}
 		} else {
-			b.Send("Use commands to operate with the bot", update.Message.Chat.ID)
+			if err := b.Send("Use commands to operate with the bot", update.Message.Chat.ID); err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
 }
@@ -82,7 +94,9 @@ func (b *Bot) Stop() {
 	for chatID := range b.data {
 		b.data[chatID].Stop()
 		for _, url := range b.data[chatID].Export() {
-			os.WriteFile(b.fileName, []byte(strconv.FormatInt(chatID, 10)+" "+url+"\n"), 0644)
+			if err := os.WriteFile(b.fileName, []byte(strconv.FormatInt(chatID, 10)+" "+url+"\n"), 0644); err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
 }
