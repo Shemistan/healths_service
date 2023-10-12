@@ -1,14 +1,10 @@
 package service
 
 import (
-	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,128 +15,78 @@ import (
 )
 
 func (s *service) CheckApiUrl(ctx context.Context, bot *tgbotapi.BotAPI) {
-	apiWithNameList, err := getApiListWithName()
+	apiWithNameList, err := GetApiListWithName()
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Указываем количество горутин
-	goroutineCount := s.cfg.GoroutineCount
+	//goroutineCount := s.cfg.GoroutineCount
+	//requests := make(chan models.ApiWithName, len(apiWithNameList))
 
-	requests := make(chan models.ApiWithName, len(apiWithNameList))
-	wg := sync.WaitGroup{}
-
-	go func() {
-		for _, api := range apiWithNameList {
-			requests <- api
-		}
-	}()
-
-	defer close(requests)
-
-	wg.Add(goroutineCount)
-
-	for i := 0; i < goroutineCount; i++ {
-		go func() {
-			defer wg.Done()
-			checkUrl(requests, s.cfg.ChatID, bot)
-		}()
+	stg := models.Settings{
+		ChatID: s.cfg.ChatID,
+		Urls:   apiWithNameList,
+		Bot:    bot,
 	}
-
-	go func() {
-		wg.Wait()
-	}()
 
 	for {
 		select {
 		case <-time.After(s.cfg.Delay):
-			for _, api := range apiWithNameList {
-				requests <- api
-			}
+			checkServices(stg)
 		case <-time.After(s.cfg.DelayBd):
 			log.Println("Add to bd logs")
 		case <-ctx.Done():
 			return
 		}
 	}
-	//ticker := time.NewTicker(s.cfg.Delay)
-	//for range ticker.C {
-	//	for _, api := range apiWithNameList {
-	//		requests <- api
-	//	}
-	//}
 }
 
-// getApiUrl
-// Получаем список урлов из текстового файла
-func getApiUrl() ([]string, error) {
-	apiList := make([]string, 0)
+func checkServices(st models.Settings) {
+	var wg sync.WaitGroup
+	results := make(chan models.ApiWithName)
 
-	file, err := os.Open("config/api_list.txt")
-	if err != nil {
-		fmt.Println("Ошибка открытия файла:", err)
-		return nil, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		url := scanner.Text()
-		apiList = append(apiList, url)
+	for _, api := range st.Urls {
+		wg.Add(1)
+		go checkService(api, &wg, st, results)
 	}
 
-	if scanner.Err() != nil {
-		fmt.Println("Ошибка чтения файла:", scanner.Err())
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	for api := range results {
+		log.Println(api)
 	}
-	return apiList, nil
 }
 
-func getApiListWithName() ([]models.ApiWithName, error) {
-	apiList, err := getApiUrl()
-	if err != nil {
-		return nil, err
-	}
-	if len(apiList) == 0 {
-		return nil, errors.New("empty api list")
-	}
-
-	apiWithNameList := make([]models.ApiWithName, 0)
-
-	for _, api := range apiList {
-		words := strings.Fields(api)
-		apiWithNameList = append(apiWithNameList, models.ApiWithName{
-			Name: words[0],
-			Url:  words[1],
-		})
-	}
-	return apiWithNameList, nil
-}
-
-func checkUrl(requests chan models.ApiWithName, chatID int64, bot *tgbotapi.BotAPI) {
+func checkService(api models.ApiWithName, wg *sync.WaitGroup, st models.Settings, results chan<- models.ApiWithName) {
 	var status string
-	for api := range requests {
-		resp, err := http.Get(api.Url)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			log.Printf("[%s] Ошибка мониторинга сервиса %s\n", api.Name, api.Url)
-			status = "error"
+	defer wg.Done()
 
-			msg := fmt.Sprintf("[%s] Ошибка при обращении к сервису: %s", api.Name, api.Url)
-			telegram.SendErrorMessage(bot, chatID, msg)
-		} else {
-			log.Printf("Сервис %s работает исправно\n", api)
-			status = "success"
-		}
-		///TODO add to chan for bd
-		modelForBd := models.ServiceCheck{
-			Name:     api.Name,
-			Url:      api.Url,
-			CreateAt: time.Now(),
-			Status:   status,
-		}
-		fmt.Println(modelForBd)
+	resp, err := http.Get(api.Url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		results <- api
+		log.Printf("[%s] Ошибка мониторинга сервиса %s\n", api.Name, api.Url)
+		status = "error"
 
-		if resp != nil {
-			resp.Body.Close()
-		}
+		msg := fmt.Sprintf("[%s] Ошибка при обращении к сервису: %s", api.Name, api.Url)
+		telegram.SendErrorMessage(st.Bot, st.ChatID, msg)
+	} else {
+		results <- api
+		log.Printf("Сервис %s работает исправно\n", api)
+		status = "success"
+	}
+	///TODO add to chan for bd
+	modelForBd := models.ServiceCheck{
+		Name:     api.Name,
+		Url:      api.Url,
+		CreateAt: time.Now(),
+		Status:   status,
+	}
+	_ = modelForBd
+	//fmt.Println(modelForBd)
+
+	if resp != nil {
+		resp.Body.Close()
 	}
 }
