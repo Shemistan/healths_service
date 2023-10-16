@@ -2,8 +2,8 @@ package service
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -41,10 +41,11 @@ func GetApiListWithName() ([]models.ApiWithName, error) {
 		return nil, err
 	}
 	if len(apiList) == 0 {
-		return nil, errors.New("empty api list")
+		log.Println("Empty list url")
+		return nil, nil
 	}
 
-	apiWithNameList := make([]models.ApiWithName, 0)
+	apiWithNameList := make([]models.ApiWithName, 0, cap(apiList))
 
 	for _, api := range apiList {
 		words := strings.Fields(api)

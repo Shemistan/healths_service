@@ -14,31 +14,28 @@ import (
 	"github.com/Shemistan/healths_service/internal/telegram"
 )
 
-func (s *service) CheckApiUrl(ctx context.Context, bot *tgbotapi.BotAPI) {
-	apiWithNameList, err := GetApiListWithName()
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Указываем количество горутин
-	//goroutineCount := s.cfg.GoroutineCount
-	//requests := make(chan models.ApiWithName, len(apiWithNameList))
-
+func (s *service) CheckApiUrl(ctx context.Context, bot *tgbotapi.BotAPI, apiWithNameList []models.ApiWithName) {
 	stg := models.Settings{
 		ChatID: s.cfg.ChatID,
 		Urls:   apiWithNameList,
 		Bot:    bot,
 	}
 
+	ticker := time.NewTicker(s.cfg.WorkerTimeOut)
+	defer ticker.Stop()
+
 	for {
 		select {
-		case <-time.After(s.cfg.Delay):
+		case <-ticker.C:
 			checkServices(stg)
-		case <-time.After(s.cfg.DelayBd):
 			log.Println("Add to bd logs")
+		//case <-time.After(s.cfg.DelayBd):
+		//	log.Println("Add to bd logs")
 		case <-ctx.Done():
 			return
 		}
 	}
+
 }
 
 func checkServices(st models.Settings) {
@@ -47,7 +44,11 @@ func checkServices(st models.Settings) {
 
 	for _, api := range st.Urls {
 		wg.Add(1)
-		go checkService(api, &wg, st, results)
+		go func(api models.ApiWithName) {
+			defer wg.Done()
+			checkService(api, st, results)
+		}(api)
+
 	}
 
 	go func() {
@@ -59,9 +60,8 @@ func checkServices(st models.Settings) {
 	}
 }
 
-func checkService(api models.ApiWithName, wg *sync.WaitGroup, st models.Settings, results chan<- models.ApiWithName) {
+func checkService(api models.ApiWithName, st models.Settings, results chan<- models.ApiWithName) {
 	var status string
-	defer wg.Done()
 
 	resp, err := http.Get(api.Url)
 	if err != nil || resp.StatusCode != http.StatusOK {

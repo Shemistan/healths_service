@@ -9,7 +9,7 @@ import (
 )
 
 type IService interface {
-	CheckApiUrl(ctx context.Context, bot *tgbotapi.BotAPI)
+	CheckApiUrl(ctx context.Context, bot *tgbotapi.BotAPI, apiWithNameList []models.ApiWithName)
 }
 
 func NewService(cfg *models.Config) IService {

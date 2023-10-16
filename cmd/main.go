@@ -38,5 +38,11 @@ func main() {
 	}()
 
 	serv := service.NewService(&conf)
-	serv.CheckApiUrl(ctx, bot)
+
+	apiWithNameList, err := service.GetApiListWithName()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	serv.CheckApiUrl(ctx, bot, apiWithNameList)
 }
