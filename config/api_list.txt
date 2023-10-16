@@ -1,0 +1,10 @@
+delivery http://127.0.0.1:8080/healthz
+service2 http://127.0.0.1:8080/healthz2
+service3 http://127.0.0.1:8080/healthz3
+service4 http://127.0.0.1:8080/healthz4
+service5 http://127.0.0.1:8080/healthz5
+service6 http://127.0.0.1:8080/healthz5
+service7 http://127.0.0.1:8080/healthz5
+service8 http://127.0.0.1:8080/healthz5
+service9 http://127.0.0.1:8080/healthz5
+service10 http://127.0.0.1:8080/healthz5
